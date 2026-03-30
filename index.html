@@ -140,6 +140,41 @@ select.fsel:focus{border-color:var(--ac);}
 .mcancel:hover{color:var(--tx);}
 
 @keyframes fs{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+
+/* ── 모바일 반응형 ── */
+@media(max-width:768px){
+  .editor.on{display:flex;flex-direction:column;height:100dvh;}
+  .sb{flex-direction:row;padding:8px 10px;gap:6px;overflow-x:auto;overflow-y:hidden;height:58px;min-height:58px;max-height:58px;border-right:none;border-bottom:1px solid var(--bd);flex-shrink:0;position:sticky;top:0;z-index:40;background:var(--sf);}
+  .sbh{display:none;}
+  .slist{flex-direction:row;overflow-x:auto;overflow-y:hidden;flex:1;gap:5px;align-items:center;flex-wrap:nowrap;}
+  .sth{flex-direction:column;padding:4px;min-width:36px;max-width:36px;align-items:center;gap:2px;border-radius:6px;}
+  .tnum{font-size:9px;}
+  .tpv{width:26px;height:26px;}
+  .ttx{display:none;}
+  .ca{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+  .toolbar{padding:7px 10px;flex-wrap:nowrap;overflow-x:auto;gap:5px;flex-shrink:0;position:sticky;top:58px;z-index:39;background:var(--bg);}
+  .tright{gap:4px;}
+  .tb{font-size:11px;padding:5px 8px;}
+  .badge{display:none;}
+  .cwrap{padding:10px;flex:1;min-height:0;overflow:hidden;}
+  .gwrap{padding:10px;}
+  .ep{
+    position:fixed;bottom:0;left:0;right:0;
+    height:55vh;max-height:55vh;
+    border-left:none;border-top:1px solid var(--bd2);
+    border-radius:16px 16px 0 0;
+    padding:0 16px 20px;
+    z-index:50;background:var(--sf);
+    transform:translateY(calc(100% - 36px));
+    transition:transform .3s cubic-bezier(.4,0,.2,1);
+    overflow-y:auto;
+  }
+  .ep.open{transform:translateY(0);}
+  .ep-handle{display:flex;align-items:center;justify-content:center;height:36px;cursor:pointer;flex-shrink:0;position:sticky;top:0;background:var(--sf);z-index:1;}
+  .ep-handle::after{content:'';display:block;width:36px;height:4px;background:var(--bd2);border-radius:2px;}
+  .modal{width:calc(100vw - 24px);}
+  .sgrid{grid-template-columns:repeat(3,1fr) !important;}
+}
 </style>
 </head>
 <body>
@@ -210,7 +245,8 @@ select.fsel:focus{border-color:var(--ac);}
   </div>
 
   <!-- 편집 패널 -->
-  <div class="ep">
+  <div class="ep" id="ep">
+    <div class="ep-handle" onclick="if(window.innerWidth<=768)document.getElementById('ep').classList.toggle('open')"></div>
     <div><div class="el">메인 카피</div><textarea class="ei" id="eMain" rows="3" oninput="sync()"></textarea></div>
     <div><div class="el">서브 카피</div><textarea class="ei" id="eSub" rows="2" oninput="sync()"></textarea></div>
 
@@ -427,7 +463,18 @@ function renderCanvas(i){
   const st=ST[s.style]||ST.white;
   const bgColor=s.style==='custom'?s.customBg:st.bg;
   const c=document.getElementById('sc');
-  const {w,h}=FMT[fmt];
+  const isMobile=window.innerWidth<=768;
+
+  // 캔버스 크기: 모바일은 화면에 맞게, 데스크탑은 고정
+  let {w,h}=FMT[fmt];
+  if(isMobile){
+    const maxW=window.innerWidth-20;
+    const maxH=window.innerHeight-160; // 툴바+사이드바 여유
+    const ratio=w/h;
+    if(ratio>=1){ w=Math.min(maxW,maxH*ratio); h=w/ratio; }
+    else{ h=Math.min(maxH,maxW/ratio); w=h*ratio; }
+    w=Math.floor(w); h=Math.floor(h);
+  }
   c.style.width=w+'px';c.style.height=h+'px';
   c.style.animation='none';void c.offsetWidth;c.style.animation='fs .2s ease';
 
@@ -520,8 +567,10 @@ function renderGrid(){
     const bgColor=s.style==='custom'?s.customBg:st.bg;
     const bg=s.bgImage?`background-image:url(${s.bgImage});background-size:cover;background-position:center;`:`background:${bgColor};`;
     const tc=s.bgImage?'#fff':(s.txColor||st.text);
-    const oa=(s.overlay??40)/100;
-    const ov=s.style==='dark'?`rgba(0,0,0,${oa})`:`rgba(255,255,255,${oa})`;
+    const oa=(s.overlay??65)/100;
+    function isDark(hex){const h=(hex||'').replace('#','');if(h.length<6)return false;const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return(r*299+g*587+b*114)/1000<128;}
+    const bgIsDark=s.style==='dark'||(s.style==='custom'&&isDark(s.customBg||'#ffffff'));
+    const ov=bgIsDark?`rgba(0,0,0,${oa})`:`rgba(255,255,255,${oa})`;
     return`<div class="gi ${i===cur?'on':''}" style="${bg}aspect-ratio:${isR?'9/16':'1/1'};" onclick="goTo(${i});setView('single');">
       ${s.bgImage?`<div style="position:absolute;inset:0;background:${ov};"></div>`:''}
       <div class="gn" style="color:${s.bgImage?'rgba(255,255,255,.5)':st.num};z-index:1;">${String(i+1).padStart(2,'0')}</div>
@@ -740,6 +789,8 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight'||e.key==='ArrowDown')nav(1);
   if(e.key==='ArrowLeft'||e.key==='ArrowUp')nav(-1);
 });
+
+window.addEventListener('resize',()=>{if(slides.length)renderCanvas(cur);});
 
 cntLines();
 </script>
